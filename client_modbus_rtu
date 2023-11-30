@@ -11,7 +11,7 @@ class Leg:
         self.instrument.clear_buffers_before_each_transaction = True
 
     def introduce(self):
-        print("RusSlide ModbusRTU")
+        print("ModbusRTU")
 
     def read_registers(self, register_address, number_of_registers):
         try:
