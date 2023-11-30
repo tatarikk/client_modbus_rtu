@@ -1,0 +1,120 @@
+import minimalmodbus
+
+
+class Leg:
+    def __init__(self, device_port):
+        self.instrument = minimalmodbus.Instrument(device_port, 0x01, debug=True)
+        self.instrument.serial.baudrate = 115200
+        self.instrument.serial.timeout = 1
+        self.instrument.mode = minimalmodbus.MODE_RTU
+        self.instrument.serial.bytesize = 8
+        self.instrument.clear_buffers_before_each_transaction = True
+
+    def introduce(self):
+        print("RusSlide ModbusRTU")
+
+    def read_registers(self, register_address, number_of_registers):
+        try:
+            values = self.instrument.read_registers(register_address, number_of_registers)
+            return values
+        except Exception as e:
+            print(f"An error occurred: {str(e)}")
+            return None
+
+    def write_register(self, register_address, value):
+        try:
+            print("Before writing to the register")
+            self.instrument.write_register(register_address, value, functioncode=6, signed=False)
+            print("Successfully wrote to the register")
+            return True
+        except minimalmodbus.ModbusException as e:
+            if "Slave reported error code 0" in str(e):
+                print("Успешно записано в регистр")
+                return True
+            else:
+                print(f"Произошла ошибка: {str(e)}")
+                print("Error writing to the register")
+                return False
+
+    def mainMenu(self):
+        while True:
+            menuItem = int(input("Выберите:\n \
+                             1. Получить состояние штатива\n \
+                             2. Переместить выбранную ногу\n \
+                             3. Переместить все ноги\n \
+                             4. Запустить процедуру выравнивания\n \
+                             5. Получить данные MPU9250\n \
+                             0. Выход    "))
+            if menuItem == 0:
+                break
+            elif menuItem == 1:
+                for leg_id in range(1, 4):
+                    register_address = leg_id
+                    response_value = self.read_registers(register_address, number_of_registers=1)
+                    if response_value is not None:
+                        print(f"Нога {leg_id} = {response_value[0]}")
+            elif menuItem == 2:
+                leg_id = int(input("Введите ID ноги (1-3) или 0 для возврата:  "))
+                if leg_id < 1 or leg_id > 3:
+                    print("Введите правильный идентификатор", leg_id)
+                    continue
+                print("Выбрана нога:", leg_id)
+                move_to = int(input("Введите на сколько перемещаться. Для возврата в меню введите 0\n"))
+                if move_to == 0:
+                    continue
+                else:
+                    if not self.write_register(leg_id, move_to):
+                        print("Ошибка при записи в регистр")
+            elif menuItem == 3:
+                move_to = int(input("Введите на сколько перемещаться. Для возврата в меню введите 0\n"))
+                if move_to == 0:
+                    continue
+                else:
+                    for leg_id in range(1, 4):
+                        if not self.write_register(leg_id, move_to):
+                            print("Ошибка при записи в регистр")
+            elif menuItem == 4:
+                print("Запуск процедуры выравнивания")
+                if not self.write_register(40, 1):
+                    print("Ошибка при записи в регистр")
+            elif menuItem == 5:
+                register_addresses_ax = [5, 8, 11]
+                register_addresses_ay = [6, 9, 12]
+                register_addresses_az = [7, 10, 13]
+                number_of_registers = 3
+
+                response_values_ax = self.read_registers(register_addresses_ax[0], number_of_registers)
+                if response_values_ax is not None and len(response_values_ax) == 3:
+                    ax_value, ax1_value, ax2_value = response_values_ax
+                    print(f"Значение AX: {ax_value}")
+                    print(f"Значение AX1: {ax1_value}")
+                    print(f"Значение AX2: {ax2_value}")
+
+                    response_values_ay = self.read_registers(register_addresses_ay[0], number_of_registers)
+                    if response_values_ay is not None and len(response_values_ay) == 3:
+                        ay_value, ay1_value, ay2_value = response_values_ay
+                        print(f"Значение AY: {ay_value}")
+                        print(f"Значение AY1: {ay1_value}")
+                        print(f"Значение AY2: {ay2_value}")
+                    else:
+                        print("Ошибка при чтении данных AY")
+
+                    response_values_az = self.read_registers(register_addresses_az[0], number_of_registers)
+                    if response_values_az is not None and len(response_values_az) == 3:
+                        az_value, az1_value, az2_value = response_values_az
+                        print(f"Значение AZ: {az_value}")
+                        print(f"Значение AZ1: {az1_value}")
+                        print(f"Значение AZ2: {az2_value}")
+                    else:
+                        print("Ошибка при чтении данных AZ")
+
+                else:
+                    print("Ошибка при чтении данных акселерометра")
+
+            input("Нажмите Enter для продолжения...")
+
+
+if __name__ == "__main__":
+    leg0 = Leg(device_port="/dev/tty.usbserial-0001")
+    leg0.introduce()
+    leg0.mainMenu()
